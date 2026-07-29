@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="de" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Pacing Energy Rechner</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <style>
+    body {
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      background-color: #0f172a;
+      color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    .safe-area-bottom {
+      padding-bottom: env(safe-area-inset-bottom, 20px);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between pt-8 pb-20 bg-slate-900 text-slate-100">
+
+  <!-- HEADER -->
+  <header class="px-5 py-3 flex justify-between items-center bg-slate-900/90 backdrop-blur border-b border-slate-800 sticky top-0 z-50 shadow-md">
+    <h1 class="text-lg font-bold tracking-wide text-sky-400 flex items-center gap-2">
+      <i data-lucide="activity" class="w-5 h-5"></i> Pacing Rechner
+    </h1>
+    <button onclick="openSettings()" class="p-2 rounded-full bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700">
+      <i data-lucide="settings" class="w-5 h-5"></i>
+    </button>
+  </header>
+
+  <!-- MAIN CONTENT CONTAINER -->
+  <main class="flex-1 px-4 py-4 max-w-md mx-auto w-full space-y-6">
+
+    <!-- PAGE 1: RECHNER (MORGENS & ABENDS) -->
+    <div id="page-1" class="tab-content space-y-6">
+      
+      <!-- MORGEN KARTE -->
+      <div class="bg-slate-800 rounded-2xl p-5 border border-slate-700 shadow-xl space-y-4">
+        <div class="flex justify-between items-center border-b border-slate-700 pb-2">
+          <h2 class="font-bold text-lg text-sky-400 flex items-center gap-2">
+            <i data-lucide="sun" class="w-5 h-5"></i> Morgen-Check
+          </h2>
+          <span id="morgen-score-badge" class="px-3 py-1 rounded-full text-xs font-bold bg-slate-700 text-slate-300">--</span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-xs font-medium text-slate-400">Herzfrequenz (EKG)</label>
+            <input type="number" id="m-ruhepuls" value="58" onchange="calculateMorgen()" class="w-full mt-1 p-2 bg-slate-900 border border-slate-700 rounded-xl text-center text-lg font-bold text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500">
+          </div>
+          <div>
+            <label class="text-xs font-medium text-slate-400">HRV (EKG)</label>
+            <input type="number" id="m-hrv" value="38" onchange="calculateMorgen()" class="w-full mt-1 p-2 bg-slate-900 border border-slate-700 rounded-xl text-center text-lg font-bold text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500">
+          </div>
+        </div>
+
+        <div>
+          <div class="flex justify-between text-xs font-medium text-slate-400 mb-1">
+            <span>Schlafqualität (1-10)</span>
+            <span id="m-schlaf-val" class="font-bold text-slate-100">8</span>
+          </div>
+          <input type="range" id="m-schlaf" min="1" max="10" value="8" oninput="document.getElementById('m-schlaf-val').innerText=this.value; calculateMorgen();" class="w-full accent-sky-500">
+        </div>
+
+        <!-- TRIGGER SEKTION -->
+        <div class="space-y-3 pt-2 border-t border-slate-700">
+          <label class="text-xs font-bold text-slate-400 uppercase tracking-wider">Trigger & Last</label>
+
+          <div class="grid grid-cols-2 gap-2 text-xs">
+            <select id="m-zyklus" onchange="calculateMorgen()" class="p-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200">
+              <option value="0">Zyklus: Keine</option>
+              <option value="-5">Zyklus: PMS (-5)</option>
+              <option value="-25">Zyklus: Menstruation (-25)</option>
+            </select>
+
+            <select id="m-hitze" onchange="calculateMorgen()" class="p-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200">
+              <option value="0">Hitze: Nein</option>
+              <option value="-25">Hitze: Ja (-25)</option>
+            </select>
+
+            <select id="m-wetter" onchange="calculateMorgen()" class="p-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200">
+              <option value="0">Wetterwechsel: Nein</option>
+              <option value="-15">Wetterwechsel: Ja (-15)</option>
+            </select>
+
+            <select id="m-crash" onchange="calculateMorgen()" class="p-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200">
+              <option value="0">PEM/Crash: Nein</option>
+              <option value="-35">PEM/Crash: Ja (-35)</option>
+            </select>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2 text-xs">
+            <div>
+              <label class="text-[10px] font-medium text-slate-400">Symptomlast (0-3)</label>
+              <select id="m-symptom-level" onchange="calculateMorgen()" class="w-full mt-1 p-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200">
+                <option value="0">0: Keine (0)</option>
+                <option value="-10" selected>1: Leicht (-10)</option>
+                <option value="-20">2: Mittel (-20)</option>
+                <option value="-35">3: Stark (-35)</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-[10px] font-medium text-slate-400">Vorbelastung (0-3)</label>
+              <select id="m-belastung" onchange="calculateMorgen()" class="w-full mt-1 p-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200">
+                <option value="0">0: Keine (0)</option>
+                <option value="-10" selected>1: Leicht (-10)</option>
+                <option value="-20">2: Mittel (-20)</option>
+                <option value="-35">3: Stark (-35)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <button onclick="saveMorgen()" class="w-full py-3 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl shadow transition">
+          Morgenwerte Speichern & Budget Aktivieren
+        </button>
+      </div>
+
+      <!-- ABEND KARTE -->
+      <div id="abend-card" class="bg-slate-800 rounded-2xl p-5 border border-slate-700 shadow-xl space-y-4 opacity-50 pointer-events-none transition-all">
+        <div class="flex justify-between items-center border-b border-slate-700 pb-2">
+          <h2 class="font-bold text-lg text-indigo-400 flex items-center gap-2">
+            <i data-lucide="moon" class="w-5 h-5"></i> Abend-Check
+          </h2>
+          <span id="abend-score-badge" class="px-3 py-1 rounded-full text-xs font-bold bg-slate-700 text-slate-300">--</span>
+        </div>
+
+        <div class="grid grid-cols-3 gap-2">
+          <div>
+            <label class="text-[10px] font-medium text-slate-400">Ruhepuls Tag</label>
+            <input type="number" id="a-ruhepuls" value="62" onchange="calculateAbend()" class="w-full mt-1 p-2 bg-slate-900 border border-slate-700 rounded-xl text-center font-bold text-slate-100">
+          </div>
+          <div>
+            <label class="text-[10px] font-medium text-slate-400">Ø HRV Tags</label>
+            <input type="number" id="a-hrv" value="20" onchange="calculateAbend()" class="w-full mt-1 p-2 bg-slate-900 border border-slate-700 rounded-xl text-center font-bold text-slate-100">
+          </div>
+          <div>
+            <label class="text-[10px] font-medium text-slate-400">HRR Erholung</label>
+            <input type="number" id="a-hrr" value="15" onchange="calculateAbend()" class="w-full mt-1 p-2 bg-slate-900 border border-slate-700 rounded-xl text-center font-bold text-slate-100">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="text-xs font-medium text-slate-400">Pulsbewertung</label>
+            <select id="a-pulsbewertung" onchange="calculateAbend()" class="w-full mt-1 p-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs">
+              <option value="0">0: Gut (100 Pkt)</option>
+              <option value="-15">1: Mittel (-15 Pkt)</option>
+              <option value="-30" selected>2: Miese Kurve (-30 Pkt)</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-xs font-medium text-slate-400">Crash / PEM Abends</label>
+            <select id="a-crash" onchange="calculateAbend()" class="w-full mt-1 p-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs">
+              <option value="0">Nein (0 Pkt)</option>
+              <option value="-35">Ja (-35 Pkt)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <div>
+            <label class="text-[10px] font-medium text-slate-400">Symptome Tagsüber</label>
+            <select id="a-symptom-level" onchange="calculateAbend()" class="w-full mt-1 p-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200">
+              <option value="0">0: Keine (0)</option>
+              <option value="-10">1: Leicht (-10)</option>
+              <option value="-20">2: Mittel (-20)</option>
+              <option value="-35" selected>3: Stark (-35)</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-[10px] font-medium text-slate-400">Belastung Tagsüber</label>
+            <select id="a-belastung" onchange="calculateAbend()" class="w-full mt-1 p-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200">
+              <option value="0">0: Keine (0)</option>
+              <option value="-10" selected>1: Leicht (-10)</option>
+              <option value="-20">2: Mittel (-20)</option>
+              <option value="-35">3: Stark (-35)</option>
+            </select>
+          </div>
+        </div>
+
+        <button onclick="saveAbend()" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow transition">
+          Abendwerte Speichern & Tagesbericht
+        </button>
+      </div>
+
+      <!-- TAGESBERICHT WIDGET -->
+      <div id="tagesbericht" class="hidden bg-slate-800 rounded-2xl p-5 border border-slate-700 shadow-xl space-y-3">
+        <h3 class="font-bold text-slate-200 text-sm flex items-center gap-2">
+          <i data-lucide="file-text" class="w-4 h-4 text-sky-400"></i> Tagesbericht Gesamt
+        </h3>
+        <div class="grid grid-cols-2 gap-3 text-center">
+          <div class="bg-slate-900 p-3 rounded-xl border border-slate-800">
+            <div class="text-[10px] font-medium text-slate-400">Tages-Budget</div>
+            <div id="tb-budget" class="text-xl font-extrabold text-sky-400">--</div>
+          </div>
+          <div class="bg-slate-900 p-3 rounded-xl border border-slate-800">
+            <div class="text-[10px] font-medium text-slate-400">Erholungswert</div>
+            <div id="tb-erholung" class="text-xl font-extrabold text-indigo-400">--</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- PAGE 2: TAGEBUCH -->
+    <div id="page-2" class="tab-content hidden space-y-4">
+      <h2 class="text-lg font-bold text-slate-100 flex items-center gap-2">
+        <i data-lucide="book-open" class="w-5 h-5 text-sky-400"></i> Tagebuch
+      </h2>
+      <div class="bg-slate-800 rounded-2xl overflow-hidden border border-slate-700 shadow-lg">
+        <table class="w-full text-left border-collapse text-xs">
+          <thead>
+            <tr class="bg-slate-900 text-slate-400 border-b border-slate-700">
+              <th class="p-3">Datum</th>
+              <th class="p-3 text-center">Morgen</th>
+              <th class="p-3 text-center">Abend</th>
+              <th class="p-3 text-center">Crash?</th>
+            </tr>
+          </thead>
+          <tbody id="tagebuch-list" class="divide-y divide-slate-700/50">
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PAGE 3: VERLAUF & DATEN -->
+    <div id="page-3" class="tab-content hidden space-y-5">
+      <h2 class="text-lg font-bold text-slate-100 flex items-center gap-2">
+        <i data-lucide="line-chart" class="w-5 h-5 text-sky-400"></i> Verlaufsansichten
+      </h2>
+      
+      <div class="grid grid-cols-2 gap-3">
+        <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 shadow-lg text-center">
+          <div class="text-xs font-medium text-slate-400">Ø 7-Tage Budget</div>
+          <div id="avg-budget" class="text-2xl font-bold text-sky-400 mt-1">--</div>
+        </div>
+        <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 shadow-lg text-center">
+          <div class="text-xs font-medium text-slate-400">Ø 7-Tage Erholung</div>
+          <div id="avg-erholung" class="text-2xl font-bold text-indigo-400 mt-1">--</div>
+        </div>
+      </div>
+
+      <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 shadow-lg">
+        <h3 class="text-xs font-semibold text-slate-400 mb-3">7-Tage Trend Diagramm</h3>
+        <canvas id="trendChart" class="w-full h-48"></canvas>
+      </div>
+    </div>
+
+    <!-- PAGE 4: SYMPTOME -->
+    <div id="page-4" class="tab-content hidden space-y-6">
+      <h2 class="text-lg font-bold text-slate-100 flex items-center gap-2">
+        <i data-lucide="thermometer" class="w-5 h-5 text-sky-400"></i> Symptom-Tracker (0-3)
+      </h2>
+      
+      <div id="symptom-list" class="space-y-2">
+      </div>
+
+      <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 shadow-lg flex justify-between items-center">
+        <span class="text-xs font-semibold text-slate-300">Berechneter Abzug:</span>
+        <span id="symptom-score-deduction" class="text-lg font-bold text-rose-400">0 Pkt</span>
+      </div>
+
+      <button onclick="saveTodaySymptoms()" class="w-full py-3 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl shadow transition">
+        Heutige Symptome im Verlauf Speichern
+      </button>
+
+      <div class="space-y-2 pt-4 border-t border-slate-700">
+        <h3 class="text-sm font-bold text-slate-200 flex items-center gap-2">
+          <i data-lucide="table" class="w-4 h-4 text-sky-400"></i> Symptom-Verlauf
+        </h3>
+        <div class="bg-slate-800 rounded-2xl border border-slate-700 p-1 shadow-lg overflow-hidden">
+          <table class="w-full table-fixed text-center border-collapse text-[8px] leading-tight">
+            <thead>
+              <tr class="bg-slate-900 text-slate-400 border-b border-slate-700">
+                <th class="py-1 px-0.5 text-left w-[20%]">Datum</th>
+                <th class="py-1 px-0 text-center">Schm.</th>
+                <th class="py-1 px-0 text-center">Verd.</th>
+                <th class="py-1 px-0 text-center">Tinn.</th>
+                <th class="py-1 px-0 text-center">Schw.</th>
+                <th class="py-1 px-0 text-center">Grip.</th>
+                <th class="py-1 px-0 text-center">Dysa.</th>
+                <th class="py-1 px-0 text-center">Fog</th>
+                <th class="py-1 px-0 text-center">Inf.</th>
+              </tr>
+            </thead>
+            <tbody id="symptom-history-table" class="divide-y divide-slate-700/50 text-slate-300">
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- EINSTELLUNGEN MODAL -->
+  <div id="settings-modal" class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md p-5 space-y-4 max-h-[85vh] overflow-y-auto shadow-2xl text-slate-100">
+      <div class="flex justify-between items-center border-b border-slate-700 pb-2">
+        <h3 class="font-bold text-lg text-slate-100">⚙️ Sollwerte & Gewichtungen</h3>
+        <button onclick="closeSettings()" class="text-slate-400 hover:text-slate-200"><i data-lucide="x"></i></button>
+      </div>
+
+      <div class="space-y-4">
+        <div class="space-y-2 border-b border-slate-700 pb-3">
+          <h4 class="text-xs font-semibold text-sky-400 uppercase">Morgen-Berechnung</h4>
+          <div class="grid grid-cols-2 gap-2 text-xs">
+            <div><label class="text-slate-400">Ruhepuls Soll</label><input type="number" id="cfg-m-rp" class="w-full p-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"></div>
+            <div><label class="text-slate-400">Gewicht Ruhepuls (%)</label><input type="number" step="0.05" id="cfg-m-w-rp" class="w-full p-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"></div>
+            <div><label class="text-slate-400">HRV Soll</label><input type="number" id="cfg-m-hrv" class="w-full p-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"></div>
+            <div><label class="text-slate-400">Gewicht HRV (%)</label><input type="number" step="0.05" id="cfg-m-w-hrv" class="w-full p-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"></div>
+            <div><label class="text-slate-400">Gewicht Schlaf (%)</label><input type="number" step="0.05" id="cfg-m-w-schlaf" class="w-full p-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"></div>
+          </div>
+        </div>
+
+        <div class="space-y-2 border-b border-slate-700 pb-3">
+          <h4 class="text-xs font-semibold text-indigo-400 uppercase">Abend-Berechnung</h4>
+          <div class="grid grid-cols-2 gap-2 text-xs">
+            <div><label class="text-slate-400">Ruhepuls Tag Soll</label><input type="number" id="cfg-a-rp" class="w-full p-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"></div>
+            <div><label class="text-slate-400">Gewicht Ruhepuls (%)</label><input type="number" step="0.05" id="cfg-a-w-rp" class="w-full p-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"></div>
+            <div><label class="text-slate-400">Ø HRV Soll</label><input type="number" id="cfg-a-hrv" class="w-full p-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"></div>
+            <div><label class="text-slate-400">Gewicht Ø HRV (%)</label><input type="number" step="0.05" id="cfg-a-w-hrv" class="w-full p-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"></div>
+            <div><label class="text-slate-400">HRR Soll</label><input type="number" id="cfg-a-hrr" class="w-full p-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"></div>
+            <div><label class="text-slate-400">Gewicht HRR (%)</label><input type="number" step="0.05" id="cfg-a-w-hrr" class="w-full p-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"></div>
+            <div><label class="text-slate-400">Gewicht Pulsbewert. (%)</label><input type="number" step="0.05" id="cfg-a-w-puls" class="w-full p-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100"></div>
+          </div>
+        </div>
+
+        <div class="pt-2 space-y-2">
+          <h4 class="text-xs font-semibold text-slate-300">Excel-Reimport</h4>
+          <input type="file" id="excel-file" accept=".xlsx, .xls" class="hidden" onchange="importExcel(event)">
+          <button onclick="document.getElementById('excel-file').click()" class="w-full py-2 bg-slate-900 hover:bg-slate-700 border border-slate-700 rounded-xl text-xs font-semibold text-slate-300 flex items-center justify-center gap-2">
+            <i data-lucide="upload" class="w-4 h-4"></i> Neue Excel-Tabelle hochladen
+          </button>
+        </div>
+      </div>
+
+      <button onclick="saveSettings()" class="w-full py-3 bg-sky-600 hover:bg-sky-500 font-bold text-white rounded-xl mt-4 shadow">
+        Einstellungen Speichern
+      </button>
+    </div>
+  </div>
+
+  <!-- BOTTOM NAVBAR -->
+  <nav class="fixed bottom-0 inset-x-0 bg-slate-900/95 backdrop-blur border-t border-slate-800 safe-area-bottom z-40 shadow-2xl">
+    <div class="flex justify-around items-center h-16 max-w-md mx-auto">
+      <button onclick="switchTab(1)" id="nav-1" class="flex flex-col items-center gap-1 text-sky-400">
+        <i data-lucide="calculator" class="w-5 h-5"></i>
+        <span class="text-[10px] font-medium">Rechner</span>
+      </button>
+      <button onclick="switchTab(2)" id="nav-2" class="flex flex-col items-center gap-1 text-slate-500 hover:text-slate-300">
+        <i data-lucide="book-open" class="w-5 h-5"></i>
+        <span class="text-[10px] font-medium">Tagebuch</span>
+      </button>
+      <button onclick="switchTab(3)" id="nav-3" class="flex flex-col items-center gap-1 text-slate-500 hover:text-slate-300">
+        <i data-lucide="bar-chart-2" class="w-5 h-5"></i>
+        <span class="text-[10px] font-medium">Verlauf</span>
+      </button>
+      <button onclick="switchTab(4)" id="nav-4" class="flex flex-col items-center gap-1 text-slate-500 hover:text-slate-300">
+        <i data-lucide="activity" class="w-5 h-5"></i>
+        <span class="text-[10px] font-medium">Symptome</span>
+      </button>
+    </div>
+  </nav>
+
+  <script>
+    let config = {
+      morgen: { ruhepulsSoll: 56, hrvSoll: 40, wRp: 0.4, wHrv: 0.3, wSchlaf: 0.3 },
+      abend: { rpSoll: 62, hrvSoll: 40, hrrSoll: 15, wRp: 0.35, wHrv: 0.25, wHrr: 0.2, wPuls: 0.2 }
+    };
+
+    const symptomsList = ["Schmerz", "Verdauung", "Tinnitus", "Schwindel", "grippale Symptome", "Dysautonomie", "brainfog", "Infekt"];
+    let symptomScores = {};
+
+    let db = JSON.parse(localStorage.getItem('pacing_db') || '[]');
+    let symptomDb = JSON.parse(localStorage.getItem('pacing_symptom_db') || '[]');
+    let trendChartInstance = null;
+
+    document.addEventListener("DOMContentLoaded", () => {
+      lucide.createIcons();
+      initSymptoms();
+      loadSettings();
+      readURLParams();
+      renderTagebuch();
+      renderSymptomHistory();
+      initChart();
+    });
+
+    // AUTOMATISCHER URL-IMPORTER FÜR IOS KURZBEFEHLE
+    function readURLParams() {
+      const urlParams = new URLSearchParams(window.location.search);
+      let autoSaveAbend = false;
+      let hasMorgenParams = false;
+
+      if (urlParams.has('m_puls')) { document.getElementById('m-ruhepuls').value = urlParams.get('m_puls'); hasMorgenParams = true; }
+      if (urlParams.has('m_hrv')) { document.getElementById('m-hrv').value = urlParams.get('m_hrv'); hasMorgenParams = true; }
+      if (urlParams.has('m_schlaf')) {
+        document.getElementById('m-schlaf').value = urlParams.get('m_schlaf');
+        document.getElementById('m-schlaf-val').innerText = urlParams.get('m_schlaf');
+        hasMorgenParams = true;
+      }
+
+      calculateMorgen();
+
+      if (urlParams.has('a_puls')) { document.getElementById('a-ruhepuls').value = urlParams.get('a_puls'); autoSaveAbend = true; }
+      if (urlParams.has('a_hrv')) { document.getElementById('a-hrv').value = urlParams.get('a_hrv'); autoSaveAbend = true; }
+      if (urlParams.has('a_hrr')) { document.getElementById('a-hrr').value = urlParams.get('a_hrr'); autoSaveAbend = true; }
+
+      if (autoSaveAbend) {
+        calculateAbend();
+        document.getElementById('abend-card').classList.remove('opacity-50', 'pointer-events-none');
+        saveAbend();
+      } else {
+        calculateAbend();
+      }
+    }
+
+    function switchTab(p) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      document.getElementById(`page-${p}`).classList.remove('hidden');
+      for(let i=1; i<=4; i++) {
+        const btn = document.getElementById(`nav-${i}`);
+        if(i === p) btn.className = "flex flex-col items-center gap-1 text-sky-400";
+        else btn.className = "flex flex-col items-center gap-1 text-slate-500 hover:text-slate-300";
+      }
+      if(p===3) updateChart();
+    }
+
+    function getScoreBadgeHtml(score) {
+      if(score < 30) return `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-950/80 text-rose-300 border border-rose-800">🔴 ${score.toFixed(1)}</span>`;
+      if(score <= 60) return `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-950/80 text-amber-300 border border-amber-800">🟠 ${score.toFixed(1)}</span>`;
+      return `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-800">🟢 ${score.toFixed(1)}</span>`;
+    }
+
+    // MORGEN-BERECHNUNG MIT PULS-TOLERANZZONE (50 - 58 BPM)
+    function calculateMorgen() {
+      const rp = parseFloat(document.getElementById('m-ruhepuls').value) || config.morgen.ruhepulsSoll;
+      const hrv = parseFloat(document.getElementById('m-hrv').value) || config.morgen.hrvSoll;
+      const schlaf = parseFloat(document.getElementById('m-schlaf').value) || 8;
+
+      // Toleranzzone Ruhepuls: 50 bis 58 BPM = 100 Punkte (0 Abzug)
+      let scoreRp = 100;
+      if (rp < 50) {
+        scoreRp = 100 - (50 - rp);
+      } else if (rp > 58) {
+        scoreRp = 100 - (rp - 58);
+      }
+
+      // HRV vergleicht aktuell noch gegen deinen eingestellten Sollwert
+      const scoreHrv = 100 - Math.abs(hrv - config.morgen.hrvSoll);
+      const scoreSchlaf = schlaf * 10;
+
+      const baseline = (scoreRp * config.morgen.wRp) + (scoreHrv * config.morgen.wHrv) + (scoreSchlaf * config.morgen.wSchlaf);
+
+      const abzug = parseFloat(document.getElementById('m-zyklus').value) +
+                    parseFloat(document.getElementById('m-hitze').value) +
+                    parseFloat(document.getElementById('m-wetter').value) +
+                    parseFloat(document.getElementById('m-crash').value) +
+                    parseFloat(document.getElementById('m-symptom-level').value) +
+                    parseFloat(document.getElementById('m-belastung').value);
+
+      const budget = Math.max(0, baseline + abzug);
+      document.getElementById('morgen-score-badge').innerHTML = getScoreBadgeHtml(budget);
+      return budget;
+    }
+
+    function saveMorgen() {
+      const budget = calculateMorgen();
+      const dateStr = new Date().toISOString().split('T')[0];
+      localStorage.setItem('pacing_morgen_today', JSON.stringify({ date: dateStr, budget }));
+      document.getElementById('abend-card').classList.remove('opacity-50', 'pointer-events-none');
+      alert(`Morgen-Budget gespeichert: ${budget.toFixed(1)}`);
+    }
+
+    // ABEND-BERECHNUNG MIT PULS-TOLERANZZONE (58 - 65 BPM)
+    function calculateAbend() {
+      const rp = parseFloat(document.getElementById('a-ruhepuls').value) || config.abend.rpSoll;
+      const hrv = parseFloat(document.getElementById('a-hrv').value) || config.abend.hrvSoll;
+      const hrr = parseFloat(document.getElementById('a-hrr').value) || config.abend.hrrSoll;
+      const pulsbewertung = parseFloat(document.getElementById('a-pulsbewertung').value);
+      const abendCrash = parseFloat(document.getElementById('a-crash').value);
+
+      // Ruhepuls Tag Toleranzzone: 58 bis 65 BPM
+      let scoreRp = 100;
+      if (rp < 58) scoreRp = 100 - (58 - rp);
+      else if (rp > 65) scoreRp = 100 - (rp - 65);
+
+      const scoreHrv = 100 - Math.abs(hrv - config.abend.hrvSoll);
+      const scoreHrr = 100 - Math.abs(hrr - config.abend.hrrSoll);
+      const scorePuls = 100 + pulsbewertung;
+
+      const verbrauch = (scoreRp * config.abend.wRp) + (scoreHrv * config.abend.wHrv) + (scoreHrr * config.abend.wHrr) + (scorePuls * config.abend.wPuls);
+
+      const abzug = parseFloat(document.getElementById('a-symptom-level').value) +
+                    parseFloat(document.getElementById('a-belastung').value) +
+                    abendCrash;
+
+      const erholung = Math.max(0, verbrauch + abzug);
+      document.getElementById('abend-score-badge').innerHTML = getScoreBadgeHtml(erholung);
+      return erholung;
+    }
+
+    function saveAbend() {
+      const dateStr = new Date().toISOString().split('T')[0];
+      const morgenGespeichert = JSON.parse(localStorage.getItem('pacing_morgen_today') || 'null');
+      const budget = (morgenGespeichert && morgenGespeichert.date === dateStr) ? morgenGespeichert.budget : calculateMorgen();
+      const erholung = calculateAbend();
+      const crash = document.getElementById('m-crash').value === "-35" || document.getElementById('a-crash').value === "-35";
+
+      const entry = { date: dateStr, budget, erholung, crash };
+      db = db.filter(e => e.date !== dateStr);
+      db.unshift(entry);
+      localStorage.setItem('pacing_db', JSON.stringify(db));
+
+      document.getElementById('tb-budget').innerText = budget.toFixed(1);
+      document.getElementById('tb-erholung').innerText = erholung.toFixed(1);
+      document.getElementById('tagesbericht').classList.remove('hidden');
+
+      renderTagebuch();
+      alert("Tageswerte vollständig gespeichert!");
+    }
+
+    function renderTagebuch() {
+      const tbody = document.getElementById('tagebuch-list');
+      tbody.innerHTML = db.map(e => `
+        <tr class="hover:bg-slate-700/30">
+          <td class="p-3 font-medium text-slate-200">${e.date}</td>
+          <td class="p-3 text-center">${getScoreBadgeHtml(e.budget)}</td>
+          <td class="p-3 text-center">${getScoreBadgeHtml(e.erholung)}</td>
+          <td class="p-3 text-center">${e.crash ? '<span class="px-2 py-0.5 rounded bg-rose-950 text-rose-300 font-bold border border-rose-800">JA</span>' : '<span class="text-slate-500">Nein</span>'}</td>
+        </tr>
+      `).join('');
+    }
+
+    function initSymptoms() {
+      const container = document.getElementById('symptom-list');
+      container.innerHTML = symptomsList.map(s => {
+        symptomScores[s] = 0;
+        return `
+          <div class="bg-slate-800 p-3 rounded-xl border border-slate-700 shadow-md flex justify-between items-center">
+            <span class="text-xs font-medium text-slate-200">${s}</span>
+            <div class="flex gap-1">
+              ${[0,1,2,3].map(v => `<button onclick="setSymptom('${s}', ${v})" id="sym-${s}-${v}" class="sym-btn-${s} w-8 h-8 rounded-lg text-xs font-bold transition ${v===0 ? 'bg-sky-950 text-sky-400 border border-sky-800' : 'bg-slate-900 text-slate-400'}">${v}</button>`).join('')}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function setSymptom(s, val) {
+      symptomScores[s] = val;
+      document.querySelectorAll(`.sym-btn-${s}`).forEach((b, i) => {
+        b.className = `sym-btn-${s} w-8 h-8 rounded-lg text-xs font-bold transition ${i===val ? (val===0 ? 'bg-sky-600 text-white' : 'bg-rose-600 text-white') : 'bg-slate-900 text-slate-400'}`;
+      });
+      const total = Object.values(symptomScores).reduce((a,b)=>a+b, 0);
+      document.getElementById('symptom-score-deduction').innerText = `-${total * 5} Pkt`;
+    }
+
+    function saveTodaySymptoms() {
+      const dateStr = new Date().toISOString().split('T')[0];
+      const entry = { date: dateStr, ...symptomScores };
+      
+      symptomDb = symptomDb.filter(e => e.date !== dateStr);
+      symptomDb.unshift(entry);
+      localStorage.setItem('pacing_symptom_db', JSON.stringify(symptomDb));
+      
+      renderSymptomHistory();
+      alert("Symptomwerte für heute gespeichert!");
+    }
+
+    function renderSymptomHistory() {
+      const tbody = document.getElementById('symptom-history-table');
+      tbody.innerHTML = symptomDb.map(e => {
+        const shortDate = e.date ? e.date.slice(5) : '--';
+        return `
+        <tr class="hover:bg-slate-700/30">
+          <td class="py-1 px-0.5 text-left font-medium text-slate-200 truncate">${shortDate}</td>
+          <td class="py-1 px-0">${e['Schmerz'] ?? 0}</td>
+          <td class="py-1 px-0">${e['Verdauung'] ?? 0}</td>
+          <td class="py-1 px-0">${e['Tinnitus'] ?? 0}</td>
+          <td class="py-1 px-0">${e['Schwindel'] ?? 0}</td>
+          <td class="py-1 px-0">${e['grippale Symptome'] ?? 0}</td>
+          <td class="py-1 px-0">${e['Dysautonomie'] ?? 0}</td>
+          <td class="py-1 px-0">${e['brainfog'] ?? 0}</td>
+          <td class="py-1 px-0">${e['Infekt'] ?? 0}</td>
+        </tr>
+        `;
+      }).join('');
+    }
+
+    function openSettings() {
+      document.getElementById('cfg-m-rp').value = config.morgen.ruhepulsSoll;
+      document.getElementById('cfg-m-w-rp').value = config.morgen.wRp;
+      document.getElementById('cfg-m-hrv').value = config.morgen.hrvSoll;
+      document.getElementById('cfg-m-w-hrv').value = config.morgen.wHrv;
+      document.getElementById('cfg-m-w-schlaf').value = config.morgen.wSchlaf;
+
+      document.getElementById('cfg-a-rp').value = config.abend.rpSoll;
+      document.getElementById('cfg-a-w-rp').value = config.abend.wRp;
+      document.getElementById('cfg-a-hrv').value = config.abend.hrvSoll;
+      document.getElementById('cfg-a-w-hrv').value = config.abend.wHrv;
+      document.getElementById('cfg-a-hrr').value = config.abend.hrrSoll;
+      document.getElementById('cfg-a-w-hrr').value = config.abend.wHrr;
+      document.getElementById('cfg-a-w-puls').value = config.abend.wPuls;
+
+      document.getElementById('settings-modal').classList.remove('hidden');
+    }
+
+    function closeSettings() {
+      document.getElementById('settings-modal').classList.add('hidden');
+    }
+
+    function saveSettings() {
+      config.morgen.ruhepulsSoll = parseFloat(document.getElementById('cfg-m-rp').value) || 56;
+      config.morgen.wRp = parseFloat(document.getElementById('cfg-m-w-rp').value) || 0.4;
+      config.morgen.hrvSoll = parseFloat(document.getElementById('cfg-m-hrv').value) || 40;
+      config.morgen.wHrv = parseFloat(document.getElementById('cfg-m-w-hrv').value) || 0.3;
+      config.morgen.wSchlaf = parseFloat(document.getElementById('cfg-m-w-schlaf').value) || 0.3;
+
+      config.abend.rpSoll = parseFloat(document.getElementById('cfg-a-rp').value) || 62;
+      config.abend.wRp = parseFloat(document.getElementById('cfg-a-w-rp').value) || 0.35;
+      config.abend.hrvSoll = parseFloat(document.getElementById('cfg-a-hrv').value) || 40;
+      config.abend.wHrv = parseFloat(document.getElementById('cfg-a-w-hrv').value) || 0.25;
+      config.abend.hrrSoll = parseFloat(document.getElementById('cfg-a-hrr').value) || 15;
+      config.abend.wHrr = parseFloat(document.getElementById('cfg-a-w-hrr').value) || 0.2;
+      config.abend.wPuls = parseFloat(document.getElementById('cfg-a-w-puls').value) || 0.2;
+
+      localStorage.setItem('pacing_config', JSON.stringify(config));
+      closeSettings();
+      calculateMorgen();
+      calculateAbend();
+      alert("Einstellungen erfolgreich gespeichert!");
+    }
+
+    function loadSettings() {
+      const saved = localStorage.getItem('pacing_config');
+      if (saved) {
+        config = JSON.parse(saved);
+      }
+    }
+
+    function initChart() {
+      const ctx = document.getElementById('trendChart').getContext('2d');
+      trendChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [
+            { label: 'Budget', data: [], borderColor: '#38bdf8', backgroundColor: 'rgba(56, 189, 248, 0.1)', fill: true, tension: 0.3 },
+            { label: 'Erholung', data: [], borderColor: '#818cf8', backgroundColor: 'rgba(129, 140, 248, 0.1)', fill: true, tension: 0.3 }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { color: '#334155' } },
+            y: { min: 0, max: 100, ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { color: '#334155' } }
+          },
+          plugins: {
+            legend: { labels: { color: '#f8fafc', font: { size: 11 } } }
+          }
+        }
+      });
+      updateChart();
+    }
+
+    function updateChart() {
+      if (!trendChartInstance) return;
+      const recent = db.slice(0, 7).reverse();
+      trendChartInstance.data.labels = recent.map(e => e.date.slice(5));
+      trendChartInstance.data.datasets[0].data = recent.map(e => e.budget);
+      trendChartInstance.data.datasets[1].data = recent.map(e => e.erholung);
+      trendChartInstance.update();
+
+      if (recent.length > 0) {
+        const avgB = recent.reduce((a, b) => a + b.budget, 0) / recent.length;
+        const avgE = recent.reduce((a, b) => a + b.erholung, 0) / recent.length;
+        document.getElementById('avg-budget').innerText = avgB.toFixed(1);
+        document.getElementById('avg-erholung').innerText = avgE.toFixed(1);
+      }
+    }
+
+    function importExcel(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        const data = new Uint8Array(evt.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const json = XLSX.utils.sheet_to_json(firstSheet);
+        if (json && json.length > 0) {
+          alert("Excel-Daten erfolgreich eingelesen!");
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+  </script>
+</body>
+</html>
