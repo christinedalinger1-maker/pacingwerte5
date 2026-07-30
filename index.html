@@ -2,188 +2,297 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pacing Rechner</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Pacing Tracker</title>
+  
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Pacing">
+  
   <style>
     :root {
-      --bg: #0f172a;
-      --card-bg: #1e293b;
-      --accent: #38bdf8;
-      --text: #f8fafc;
-      --text-muted: #94a3b8;
+      --bg-color: #f4f6f8;
+      --card-bg: #ffffff;
+      --primary: #2c3e50;
+      --accent: #3498db;
+      --success: #2ecc71;
+      --text: #333333;
+      --border: #e0e0e0;
     }
+
+    * {
+      box-sizing: border-box;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: var(--bg);
+      background-color: var(--bg-color);
       color: var(--text);
       margin: 0;
-      padding: 20px;
-      display: flex;
-      justify-content: center;
+      padding: 16px;
+      padding-bottom: 40px;
     }
+
     .container {
-      width: 100%;
-      max-width: 480px;
+      max-width: 500px;
+      margin: 0 auto;
     }
+
+    h1 {
+      font-size: 1.5rem;
+      color: var(--primary);
+      text-align: center;
+      margin-top: 10px;
+      margin-bottom: 20px;
+    }
+
     .card {
       background: var(--card-bg);
-      border-radius: 16px;
-      padding: 20px;
-      margin-bottom: 20px;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     }
-    h2 { margin-top: 0; color: var(--accent); }
-    .form-group { margin-bottom: 15px; }
-    label { display: block; margin-bottom: 5px; font-size: 0.9em; color: var(--text-muted); }
+
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: var(--primary);
+      border-bottom: 2px solid var(--bg-color);
+      padding-bottom: 6px;
+    }
+
+    .form-group {
+      margin-bottom: 12px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.9rem;
+      font-weight: 500;
+      margin-bottom: 4px;
+      color: #666;
+    }
+
     input, textarea {
       width: 100%;
-      padding: 10px;
+      padding: 10px 12px;
+      font-size: 1rem;
+      border: 1px solid var(--border);
       border-radius: 8px;
-      border: 1px solid #334155;
-      background: #0f172a;
-      color: var(--text);
-      box-sizing: border-box;
+      background: #fafafa;
+      outline: none;
     }
-    button {
+
+    .row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .row .form-group {
+      flex: 1;
+    }
+
+    .status-badge {
+      display: block;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-top: 8px;
+      text-align: center;
+    }
+
+    .status-ideal { background: #e8f8f5; color: #117a65; }
+    .status-warn { background: #fef9e7; color: #b7950b; }
+
+    .btn {
+      display: block;
       width: 100%;
-      padding: 12px;
-      border-radius: 8px;
+      padding: 14px;
+      background: #27ae60;
+      color: white;
       border: none;
-      background: var(--accent);
-      color: #0f172a;
-      font-weight: bold;
-      font-size: 1em;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
       cursor: pointer;
+      text-align: center;
+      margin-top: 12px;
     }
-    button:disabled { opacity: 0.5; }
-    .status { margin-top: 10px; font-size: 0.85em; text-align: center; }
+
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #2c3e50;
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 20px;
+      font-size: 0.9rem;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+      z-index: 1000;
+    }
+
+    .toast.show {
+      opacity: 1;
+    }
   </style>
 </head>
 <body>
 
-<div class="container">
-  <div class="card">
-    <h2>🌅 Morgen-Check</h2>
-    <form id="morgenForm">
+  <div class="container">
+    <h1>Pacing Tracker (Neon Cloud)</h1>
+
+    <div class="card">
+      <div class="card-title">Morgen-Vitalwerte</div>
+      
       <div class="form-group">
         <label for="datum">Datum</label>
-        <input type="date" id="datum" required>
+        <input type="date" id="datum" onchange="loadFromNeon()">
       </div>
+
+      <div class="row">
+        <div class="form-group">
+          <label for="puls">Morgenpuls (bpm)</label>
+          <input type="number" id="puls" placeholder="z.B. 54" min="30" max="200" oninput="evaluatePuls(this.value)">
+        </div>
+        <div class="form-group">
+          <label for="hrv">HRV (ms)</label>
+          <input type="number" id="hrv" placeholder="z.B. 45">
+        </div>
+      </div>
+
+      <div id="pulsStatus" class="status-badge status-ideal" style="display:none;"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Pacing &amp; Befinden</div>
+
       <div class="form-group">
-        <label for="puls">Ruhepuls (BPM)</label>
-        <input type="number" id="puls" placeholder="z.B. 65">
+        <label for="energieLevel">Energie-Level (1–10)</label>
+        <input type="number" id="energieLevel" min="1" max="10" placeholder="z.B. 6">
       </div>
+
       <div class="form-group">
-        <label for="hrv">HRV (ms)</label>
-        <input type="number" id="hrv" placeholder="z.B. 45">
+        <label for="notizen">Notizen / Aktivitäten / Symptome</label>
+        <textarea id="notizen" rows="4" placeholder="Wie geht es dir heute?"></textarea>
       </div>
-      <div class="form-group">
-        <label for="schlaf">Schlafqualität (1-10)</label>
-        <input type="number" id="schlaf" min="1" max="10" placeholder="z.B. 7">
-      </div>
-      <div class="form-group">
-        <label for="energie">Energie-Level (1-10)</label>
-        <input type="number" id="energie" min="1" max="10" placeholder="z.B. 6">
-      </div>
-      <div class="form-group">
-        <label for="notizen">Notizen / Symptome</label>
-        <textarea id="notizen" rows="3" placeholder="Wie geht es dir heute?"></textarea>
-      </div>
-      <button type="submit" id="saveBtn">In Cloud Speichern</button>
-      <div class="status" id="statusMsg"></div>
-    </form>
+
+      <button class="btn" onclick="saveToNeon()">In Cloud Speichern</button>
+    </div>
   </div>
-</div>
 
-<script>
-  // Heutiges Datum als Standard setzen
-  const heute = new Date().toISOString().split('T')[0];
-  document.getElementById('datum').value = heute;
+  <div id="toast" class="toast">In Neon gespeichert!</div>
 
-  // Daten abrufen
-  async function datenLaden() {
-    const datum = document.getElementById('datum').value;
-    const statusMsg = document.getElementById('statusMsg');
-    statusMsg.innerText = "Lade Daten...";
-    
-    try {
-      const res = await fetch(`/api/pacing?datum=${datum}&t=${Date.now()}`);
-      const data = await res.json();
-      
-      if (data) {
-        document.getElementById('puls').value = data.puls ?? '';
-        document.getElementById('hrv').value = data.hrv ?? '';
-        document.getElementById('schlaf').value = data.schlaf ?? '';
-        document.getElementById('energie').value = data.energie ?? '';
-        document.getElementById('notizen').value = data.notizen ?? '';
-        statusMsg.innerText = "✅ Aus Cloud geladen";
-        statusMsg.style.color = "#4ade80";
-      } else {
-        document.getElementById('puls').value = '';
-        document.getElementById('hrv').value = '';
-        document.getElementById('schlaf').value = '';
-        document.getElementById('energie').value = '';
-        document.getElementById('notizen').value = '';
-        statusMsg.innerText = "Keine Daten für dieses Datum.";
-        statusMsg.style.color = "#94a3b8";
+  <script>
+    const fieldIds = ['puls', 'hrv', 'energieLevel', 'notizen'];
+
+    window.addEventListener('load', () => {
+      document.getElementById('datum').valueAsDate = new Date();
+      loadFromNeon();
+    });
+
+    // WERTEN AUS NEON CLOUD LADEN
+    async function loadFromNeon() {
+      const datum = document.getElementById('datum').value;
+      if (!datum) return;
+
+      showToast("Lade Daten...");
+      try {
+        const res = await fetch(`/api/pacing?datum=${datum}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data) {
+            document.getElementById('puls').value = data.puls || '';
+            document.getElementById('hrv').value = data.hrv || '';
+            document.getElementById('energieLevel').value = data.energie || '';
+            document.getElementById('notizen').value = data.notizen || '';
+            evaluatePuls(data.puls);
+            showToast("Daten geladen");
+          } else {
+            // Keine Daten für diesen Tag -> Felder leeren
+            fieldIds.forEach(id => document.getElementById(id).value = '');
+            evaluatePuls(null);
+            showToast("Neuer Tag");
+          }
+        }
+      } catch (err) {
+        console.error("Fehler beim Laden:", err);
+        showToast("Fehler beim Laden");
       }
-    } catch (e) {
-      statusMsg.innerText = "Fehler beim Laden!";
-      statusMsg.style.color = "#f87171";
     }
-  }
 
-  // Bei Datumsänderung neu laden
-  document.getElementById('datum').addEventListener('change', datenLaden);
+    // WERTE IN NEON CLOUD SPEICHERN
+    async function saveToNeon() {
+      const datum = document.getElementById('datum').value;
+      if (!datum) return alert("Bitte Datum wählen!");
 
-  // Formular absenden
-  document.getElementById('morgenForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const saveBtn = document.getElementById('saveBtn');
-    const statusMsg = document.getElementById('statusMsg');
-    
-    saveBtn.disabled = true;
-    statusMsg.innerText = "Speichere in Cloud...";
-    statusMsg.style.color = "#38bdf8";
+      const payload = {
+        datum: datum,
+        puls: document.getElementById('puls').value,
+        hrv: document.getElementById('hrv').value,
+        energieLevel: document.getElementById('energieLevel').value,
+        notizen: document.getElementById('notizen').value
+      };
 
-    const payload = {
-      datum: document.getElementById('datum').value,
-      puls: document.getElementById('puls').value,
-      hrv: document.getElementById('hrv').value,
-      schlaf: document.getElementById('schlaf').value,
-      energie: document.getElementById('energie').value,
-      notizen: document.getElementById('notizen').value
-    };
+      showToast("Speichere...");
 
-    try {
-      const res = await fetch('/api/pacing', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      
-      if (res.ok) {
-        statusMsg.innerText = "✨ In Cloud gespeichert!";
-        statusMsg.style.color = "#4ade80";
-      } else {
-        throw new Error('Speichern fehlgeschlagen');
+      try {
+        const res = await fetch('/api/pacing', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+          showToast("Dauerhaft in Neon gespeichert! ✓");
+        } else {
+          alert("Fehler beim Speichern in Neon.");
+        }
+      } catch (err) {
+        console.error("Speicherfehler:", err);
+        alert("Netzwerkfehler beim Speichern.");
       }
-    } catch (err) {
-      statusMsg.innerText = "❌ Fehler beim Speichern!";
-      statusMsg.style.color = "#f87171";
-    } finally {
-      saveBtn.disabled = false;
     }
-  });
 
-  // Neuladen bei App-Wechsel / Öffnen
-  window.addEventListener('pageshow', datenLaden);
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') datenLaden();
-  });
+    function evaluatePuls(pulsVal) {
+      const badge = document.getElementById('pulsStatus');
+      if (!pulsVal || isNaN(pulsVal) || pulsVal === "") {
+        badge.style.display = 'none';
+        return;
+      }
 
-  datenLaden();
-</script>
+      const p = parseFloat(pulsVal);
+      badge.style.display = 'block';
 
+      if (p >= 50 && p <= 59) {
+        badge.className = 'status-badge status-ideal';
+        badge.textContent = `Puls ${p} bpm: Idealbereich (50–59 bpm) – Keine Abweichung`;
+      } else if (p > 59) {
+        const diff = Math.round((p - 59) * 10) / 10;
+        badge.className = 'status-badge status-warn';
+        badge.textContent = `Puls ${p} bpm: +${diff} bpm über dem Idealbereich`;
+      } else {
+        const diff = Math.round((50 - p) * 10) / 10;
+        badge.className = 'status-badge status-warn';
+        badge.textContent = `Puls ${p} bpm: -${diff} bpm unter dem Idealbereich`;
+      }
+    }
+
+    function showToast(text) {
+      const toast = document.getElementById('toast');
+      toast.textContent = text;
+      toast.classList.add('show');
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 1800);
+    }
+  </script>
 </body>
 </html>
